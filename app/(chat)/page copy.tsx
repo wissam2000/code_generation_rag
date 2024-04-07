@@ -8,8 +8,6 @@ import { Code } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { OpenAI } from "openai";
 import ReactMarkdown from "react-markdown";
-import { useChat } from "ai/react";
-import { Message } from "ai";
 
 import { Heading } from "@/components/heading";
 import { Empty } from "@/components/empty";
@@ -27,16 +25,10 @@ import { UserAvatar } from "@/components/user-avatar";
 
 const CodePage = () => {
   const router = useRouter();
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    setMessages,
-    isLoading,
-    error,
-    stop,
-  } = useChat({ api: "/api/code" });
+  const [messages, setMessages] = useState<OpenAI.Chat.ChatCompletionMessage[]>(
+    []
+  );
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -46,16 +38,6 @@ const CodePage = () => {
 
   // Effect to handle window resize
   const [maxRows, setMaxRows] = useState(5); // Default to the smaller value
-  useEffect(() => {
-    // Call scrollToBottom every time messages update
-    scrollToBottom();
-  }, [messages]); // Dependency on messages ensures this effect runs every time a new message is added
-
-  // Helper function to debounce another function
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
-  };
 
   useEffect(() => {
     // Function to determine maxRows based on window width
@@ -79,15 +61,57 @@ const CodePage = () => {
 
   const messagesEndRef = useRef(null); // Ref for scrolling to the bottom
 
-  const formRef = useRef<HTMLFormElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]); // Now depends on isLoading as well
 
+  const [inputValue, setInputValue] = useState("");
+  const handleInputChange = (event) => {
+    setInputValue(event.target.value);
+  };
+
+  const onSubmit = async (
+    values: z.infer<typeof formSchema>,
+    event?: React.BaseSyntheticEvent
+  ) => {
+    // Optional: Stop the event if it's provided
+    setIsLoading(true); // Start loading
+
+    if (event) {
+      event.preventDefault();
+    }
+
+    try {
+      // Assuming your OpenAI.Chat.ChatCompletionMessage type accepts 'user' as a role,
+      // or you've handled the TypeScript issue with 'as any'.
+      const userMessage: OpenAI.Chat.ChatCompletionMessage = {
+        role: "user" as any,
+        content: values.prompt,
+      };
+
+      const newMessages = [...messages, userMessage];
+      form.reset();
+      const response = await axios.post("/api/code", {
+        messages: newMessages,
+      });
+
+      setMessages((current) => [...current, userMessage, response.data]);
+    } catch (error: any) {
+      console.error("Submission error", error);
+    } finally {
+      setIsLoading(false); // End loading
+
+      router.refresh();
+    }
+  };
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       // Check if isLoading is true, if so, do not submit
       if (!isLoading) {
         event.preventDefault(); // Always prevent the default action to avoid inserting a new line
 
-        formRef.current.requestSubmit(); // Triggers form submission
+        form.handleSubmit(onSubmit)(); // Programmatically submit the form only if not loading
       }
     }
   };
@@ -111,7 +135,7 @@ const CodePage = () => {
             <div className="flex flex-col gap-y-4">
               {messages.map((message) => (
                 <div
-                  key={message.id}
+                  key={message.content}
                   className={cn(
                     "p-8 w-full flex gap-x-8 rounded-lg",
                     (message.role as any) === "user"
@@ -144,21 +168,19 @@ const CodePage = () => {
                   </ReactMarkdown>
                 </div>
               ))}
-              <div ref={messagesEndRef} />
-
-              {/* {isLoading && (
+              {isLoading && (
                 <div className="p-8 rounded-lg w-full flex items-center justify-center bg-muted">
                   <Loader />
                 </div>
-              )} */}
+              )}
+              <div ref={messagesEndRef} />
             </div>
           </div>
         </div>
         <div className="flex pt-0 pb-4 px-4 lg:px-8 lg:pb-8 w-full">
           <Form {...form}>
             <form
-              ref={formRef}
-              onSubmit={handleSubmit}
+              onSubmit={form.handleSubmit(onSubmit)}
               className="
                  flex
                   rounded-lg
@@ -179,28 +201,17 @@ const CodePage = () => {
                     <FormControl className="m-0 p-0">
                       <TextareaAutosize
                         {...field}
-                        onKeyDown={handleKeyDown}
-                        value={input}
-                        onChange={handleInputChange}
                         className="resize-none w-full border-0 outline-none focus-visible:ring-0 focus-visible:ring-transparent"
                         placeholder="e.g., simple toggle button using react hooks"
                         minRows={1}
                         maxRows={maxRows}
-                        // onKeyDown={handleKeyDown} // Attach the onKeyDown handler here
+                        onKeyDown={handleKeyDown} // Attach the onKeyDown handler here
                       />
                     </FormControl>
                   </FormItem>
                 )}
               />
-              {isLoading ? (
-                <Button type="button" onClick={stop} disabled={!isLoading}>
-                  Stop
-                </Button>
-              ) : (
-                <Button type="submit" disabled={isLoading}>
-                  Go
-                </Button>
-              )}
+              <Button disabled={isLoading}>GO</Button>
             </form>
           </Form>
         </div>
@@ -208,13 +219,4 @@ const CodePage = () => {
     </div>
   );
 };
-
-function ChatMessage({ message: { role, content } }: { message: Message }) {
-  return (
-    <div className="mb-4">
-      <div>{role}</div>
-      <div>{content}</div>
-    </div>
-  );
-}
 export default CodePage;

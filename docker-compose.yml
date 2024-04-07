@@ -1,0 +1,21 @@
+version: "3.8"
+services:
+  code_gen_frontend:
+    container_name: code_gen_frontend
+    hostname: code_gen_frontend
+    build: "."
+    ports:
+      - "5000:3000"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+# networks:
+#   backend_network:
+#     name: code-gen-backend
+#     external: true
+
+volumes:
+  files:
+    external: true
+    name: files
