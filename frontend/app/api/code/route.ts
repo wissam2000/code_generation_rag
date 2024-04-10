@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
     // Replace `localhost` with the appropriate domain if your API is hosted.
     // Use the backend service name as defined in docker-compose.yml and the internal port
-    const apiUrl = "http://backend:8888/stream_chat/";
+    const apiUrl = `${process.env.API_END_POINT}/stream_chat/`;
 
     // Making a POST request to the FastAPI endpoint
     const apiResponse = await fetch(apiUrl, {

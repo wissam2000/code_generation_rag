@@ -1,19 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import axios from "axios";
+
 import * as z from "zod";
 import { useForm } from "react-hook-form";
 import { Code } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { OpenAI } from "openai";
+
 import ReactMarkdown from "react-markdown";
 import { useChat } from "ai/react";
-import { Message } from "ai";
 
 import { Heading } from "@/components/heading";
-import { Empty } from "@/components/empty";
-import { Loader } from "@/components/loader";
 
 import { formSchema } from "./constants";
 

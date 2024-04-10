@@ -2,7 +2,7 @@
 export async function POST(req: Request) {
   console.log("trying to stop stream...");
   try {
-    const stopUrl = "http://backend:8888/stop_stream/";
+    const stopUrl = `${process.env.API_END_POINT}/stop_stream/`;
     const response = await fetch(stopUrl, {
       method: "POST",
       headers: {
