@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8888:8888" # Expose the backend service on port 8888 on the host
+  frontend:
+    build: ./frontend
+    ports:
+      - "3333:3333" # Expose the frontend service on port 3333 on the host
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8888 # Frontend environment variable pointing to the backend service
