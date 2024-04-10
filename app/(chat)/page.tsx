@@ -24,19 +24,12 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { BotAvatar } from "@/components/bot-avatar";
 import { UserAvatar } from "@/components/user-avatar";
+import { stopStream } from "@/lib/stop_stream";
 
 const CodePage = () => {
   const router = useRouter();
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    setMessages,
-    isLoading,
-    error,
-    stop,
-  } = useChat({ api: "/api/code" });
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } =
+    useChat({ api: "/api/code" });
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -193,7 +186,11 @@ const CodePage = () => {
                 )}
               />
               {isLoading ? (
-                <Button type="button" onClick={stop} disabled={!isLoading}>
+                <Button
+                  type="button"
+                  onClick={stopStream}
+                  disabled={!isLoading}
+                >
                   Stop
                 </Button>
               ) : (
@@ -209,12 +206,4 @@ const CodePage = () => {
   );
 };
 
-function ChatMessage({ message: { role, content } }: { message: Message }) {
-  return (
-    <div className="mb-4">
-      <div>{role}</div>
-      <div>{content}</div>
-    </div>
-  );
-}
 export default CodePage;

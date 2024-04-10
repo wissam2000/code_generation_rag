@@ -1,33 +1,52 @@
-import OpenAI from "openai";
-import { OpenAIStream, StreamingTextResponse } from "ai";
-import { ChatCompletionMessage } from "openai/resources/index.mjs";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export const runtime = "edge";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const messages: ChatCompletionMessage[] = body.messages;
-
-    const intructionMessage: ChatCompletionMessage = {
-      role: "system",
-      content:
-        "You are a code generator expert. Provide a brief explanation accompannying the code. You must provide code in markdown code snippets. Use code comments for explanations.",
+    // Assuming `messages` contains the structure your FastAPI endpoint expects.
+    // Adjust the structure if needed based on FastAPI endpoint expectations.
+    const payload = {
+      messages: body.messages,
     };
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      stream: true,
-      messages: [intructionMessage, ...messages],
+
+    // Replace `localhost` with the appropriate domain if your API is hosted.
+    const apiUrl = "http://localhost:8383/stream_chat/";
+
+    // Making a POST request to the FastAPI endpoint
+    const apiResponse = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    const stream = OpenAIStream(response);
-    return new StreamingTextResponse(stream);
+    if (!apiResponse.ok) {
+      // Handling response errors (e.g., non-2xx status codes)
+      throw new Error(`API response error: ${apiResponse.status}`);
+    }
+
+    // Assuming the response is a stream; adjust if your API returns JSON or another format
+    const reader = apiResponse.body.getReader();
+    const stream = new ReadableStream({
+      async start(controller) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain" }, // Adjust based on your actual content type
+    });
   } catch (error) {
     console.error(error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    // Adjust error handling as necessary
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+    });
   }
 }
