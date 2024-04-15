@@ -3,18 +3,38 @@ from langchain.retrievers.multi_query import LineListOutputParser
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
-from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_community.vectorstores import Chroma
-from langchain.schema import Document
-from langchain_community.document_loaders.csv_loader import CSVLoader
 from dotenv import load_dotenv
-from langchain_core.callbacks.manager import AsyncCallbackManagerForRetrieverRun
-
+from langchain.retrievers import ParentDocumentRetriever
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.storage._lc_store import create_kv_docstore
+from langchain.storage import LocalFileStore
+import asyncio
 
 load_dotenv()
 
-from uuid import uuid4
-from langchain_core.callbacks.manager import AsyncCallbackManagerForRetrieverRun
+
+async def fetch_documents_for_queries(retriever, queries):
+    tasks = [retriever.aget_relevant_documents(query) for query in queries]
+    results = await asyncio.gather(*tasks)
+
+    # Use a set to track unique document contents
+    seen_contents = set()
+    unique_docs = []
+
+    for result in results:
+        for doc in result:
+            # Use the document's content to check for uniqueness
+            if doc.page_content not in seen_contents:
+                seen_contents.add(doc.page_content)
+                unique_docs.append(doc)
+
+    return unique_docs
+
+
+# Assuming `retriever` is your instance of ParentDocumentRetriever and `queries` is your list of queries
+# Call the function with:
+# unique_docs = asyncio.run(fetch_documents_for_queries(retriever, queries))
 
 async def get_docs(query: str):
     output_parser = LineListOutputParser()
@@ -27,7 +47,7 @@ async def get_docs(query: str):
 
     QUERY_PROMPT = PromptTemplate(
         input_variables=["question"],
-        template="""You are an AI language model assistant specialized in software development and programming. Your task is to generate five detailed and specific questions related to the given user request for coding. These questions should only request specifically the documentation needed to implement the request. Your goal is to ensure you have all the documentation that would aid in solving the task at hand. Provide these alternative questions separated by newlines. If the user's question is not coding related respond only with "I don't know".
+        template="""You are an AI language model assistant specialized in software development and programming. Your task is to generate five detailed and specific questions related to the given user request for coding. These questions should only request specifically the documentation needed to implement the request. Your goal is to ensure you have all the documentation that would aid in solving the task at hand. If specific documentation for something is needed. Make sure to mention the name of it multiple times in a question. Provide these alternative questions separated by newlines. If the user's question is not coding related respond only with "I don't know".
 
         Original user request: {question}
         """
@@ -35,35 +55,35 @@ async def get_docs(query: str):
 
     llm_chain = LLMChain(llm=llm, prompt=QUERY_PROMPT, output_parser=output_parser)
 
-    embedding = OpenAIEmbeddings(chunk_size=1)
-    vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embedding)
+    embedding = OpenAIEmbeddings()
 
-    retriever = MultiQueryRetriever(
-        retriever=vectorstore.as_retriever(), llm_chain=llm_chain, parser_key="lines"
+ 
+    fs = LocalFileStore("./store")
+    store = create_kv_docstore(fs)
+
+    child_splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=50)
+    parent_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+
+    vectorstore = Chroma(
+        collection_name="full_documents", embedding_function=embedding,
+        persist_directory="./chroma_db"
+    )
+    retriever = ParentDocumentRetriever(
+        vectorstore=vectorstore,
+        docstore=store,
+        child_splitter=child_splitter,
+        parent_splitter=parent_splitter,
     )
 
-    # Prepare the run manager
-    run_id = uuid4()
-    async_callback_manager = AsyncCallbackManagerForRetrieverRun(
-        run_id=run_id,
-        handlers=[],
-        inheritable_handlers=[],
-        tags=[],
-        inheritable_tags=[],
-        metadata={},
-        inheritable_metadata={}
-    )
-
-    queries = await llm_chain.ainvoke(query)
-    print(queries)
-    if any("I don't know." in query_response for query_response in queries["text"]):
+    queries = llm_chain.invoke(query)["text"]
+    # print(queries)
+    if any("I don't know" in query_response for query_response in queries):
         return ""
-    
+    print(queries)
     # Pass the run_manager to aretrieve_documents
-    unique_docs = await retriever.aretrieve_documents(
-        queries=queries,
-        run_manager=async_callback_manager  # Pass the initialized run manager here
-    )
-
-    print("WE ARE UNIQUE:", len(unique_docs))
+    unique_docs = await fetch_documents_for_queries(retriever=retriever, queries=queries)
+    print(unique_docs)
+  
     return "\n".join([result.page_content for result in unique_docs])
+
+

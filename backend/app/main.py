@@ -61,11 +61,11 @@ Answer: """
 
 async def send_message(messages: List[ChatMessage]) -> AsyncIterable[str]:
     messages[-1].content = await create_prompt(messages[-1].content)  # This needs to be within an async function
-    print(messages[-1])
+    # print(messages[-1])
     global streaming_active
     callback = AsyncIteratorCallbackHandler()
     model = ChatOpenAI(
-        model_name="gpt-3.5-turbo-0125",
+        model_name="gpt-4-turbo-2024-04-09",
         streaming=True,
         verbose=True,
         callbacks=[callback],

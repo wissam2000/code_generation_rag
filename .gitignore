@@ -34,3 +34,7 @@
 # typescript
 /frontend/*.tsbuildinfo
 /frontend/next-env.d.ts
+
+/backend/app/chroma_db
+/backend/app/store
+/backend/app/chroma_db/chroma.sqlite3
