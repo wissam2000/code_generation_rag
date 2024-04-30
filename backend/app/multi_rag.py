@@ -76,10 +76,10 @@ async def get_docs(query: str):
     )
 
     queries = llm_chain.invoke(query)["text"]
-    # print(queries)
+    print(queries)
     if any("I don't know" in query_response for query_response in queries):
         return ""
-    print(queries)
+    # print(queries)
     # Pass the run_manager to aretrieve_documents
     unique_docs = await fetch_documents_for_queries(retriever=retriever, queries=queries)
     print(unique_docs)

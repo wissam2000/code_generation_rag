@@ -51,7 +51,6 @@ Question: {question}
 Answer: """
 
 
-
     )
 # Assuming QUERY_PROMPT is your PromptTemplate instance
     formatted_prompt = QUERY_PROMPT.format(context=context, question=query)

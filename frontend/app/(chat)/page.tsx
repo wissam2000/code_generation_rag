@@ -36,16 +36,58 @@ const CodePage = () => {
 
   // Effect to handle window resize
   const [maxRows, setMaxRows] = useState(5); // Default to the smaller value
-  useEffect(() => {
-    // Call scrollToBottom every time messages update
-    scrollToBottom();
-  }, [messages]); // Dependency on messages ensures this effect runs every time a new message is added
-
-  // Helper function to debounce another function
+  const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
+  const lastScrollTop = useRef(0); // Ref to keep track of the last scroll position
+  const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    if (isAutoScrollActive) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    }
   };
+
+  // Effect for automatic scrolling when new messages arrive
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Scroll event listener to detect scroll direction
+  const handleScroll = () => {
+    const container = messagesEndRef.current?.parentNode;
+    if (container) {
+      const currentScrollTop = container.scrollTop;
+
+      // Detect scroll direction: Upward scroll immediately disables auto-scroll
+      if (currentScrollTop < lastScrollTop.current) {
+        setIsAutoScrollActive(false);
+      }
+
+      // User scrolled to the bottom, re-enable auto-scroll
+      const scrolledToBottom =
+        container.scrollHeight - currentScrollTop <= container.clientHeight;
+      if (scrolledToBottom) {
+        setIsAutoScrollActive(true);
+      }
+
+      // Update last scroll position
+      lastScrollTop.current = currentScrollTop;
+    }
+  };
+
+  // Set up the scroll event listener
+  useEffect(() => {
+    const container = messagesEndRef.current?.parentNode;
+    if (container) {
+      container.addEventListener("scroll", handleScroll, { passive: true });
+    }
+
+    // Cleanup function to remove the event listener
+    return () => {
+      if (container) {
+        container.removeEventListener("scroll", handleScroll);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Function to determine maxRows based on window width
@@ -66,8 +108,6 @@ const CodePage = () => {
     // Cleanup function to remove the event listener
     return () => window.removeEventListener("resize", handleResize);
   }, []); // Empty dependency array means this effect runs once on mount
-
-  const messagesEndRef = useRef(null); // Ref for scrolling to the bottom
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -143,6 +183,7 @@ const CodePage = () => {
               )} */}
             </div>
           </div>
+          <div ref={messagesEndRef} />
         </div>
         <div className="flex pt-0 pb-4 px-4 lg:px-8 lg:pb-8 w-full">
           <Form {...form}>
