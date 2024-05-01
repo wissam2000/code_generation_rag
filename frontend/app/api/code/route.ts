@@ -33,10 +33,12 @@ export async function POST(req: Request) {
       async start(controller) {
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            controller.close();
+            break;
+          }
           controller.enqueue(value);
         }
-        controller.close();
       },
     });
 

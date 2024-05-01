@@ -47,7 +47,7 @@ async def get_docs(query: str):
 
     QUERY_PROMPT = PromptTemplate(
         input_variables=["question"],
-        template="""You are an AI language model assistant specialized in software development and programming. Your task is to generate five detailed and specific questions related to the given user request for coding. These questions should only request specifically the documentation needed to implement the request. Your goal is to ensure you have all the documentation that would aid in solving the task at hand. If specific documentation for something is needed. Make sure to mention the name of it multiple times in a question. Provide these alternative questions separated by newlines. If the user's question is not coding related respond only with "I don't know".
+        template="""You are an AI language model assistant specialized in software development and programming. Your task is to generate five detailed and specific requirements related to the given user request for coding. These requirements should only request specifically the documentation needed to implement the request. Your goal is to ensure you have all the documentation that would aid in solving the task at hand. Provide these alternative requests separated by newlines. If the user's question is not coding related respond only with "I don't know".
 
         Original user request: {question}
         """
@@ -76,13 +76,13 @@ async def get_docs(query: str):
     )
 
     queries = llm_chain.invoke(query)["text"]
-    print(queries)
+    print(queries, flush=True)
     if any("I don't know" in query_response for query_response in queries):
         return ""
     # print(queries)
     # Pass the run_manager to aretrieve_documents
     unique_docs = await fetch_documents_for_queries(retriever=retriever, queries=queries)
-    print(unique_docs)
+    print(unique_docs, flush=True)
   
     return "\n".join([result.page_content for result in unique_docs])
 

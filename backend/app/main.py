@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from multi_rag import get_docs
 from langchain_core.prompts import PromptTemplate
 
+# Server-side
 
 app = FastAPI()
 
@@ -58,10 +59,12 @@ Answer: """
 
 
 
+global task  # Declare the task globally if needed elsewhere
+
 async def send_message(messages: List[ChatMessage]) -> AsyncIterable[str]:
-    messages[-1].content = await create_prompt(messages[-1].content)  # This needs to be within an async function
-    # print(messages[-1])
-    global streaming_active
+    global streaming_active, task
+    messages[-1].content = await create_prompt(messages[-1].content)
+
     callback = AsyncIteratorCallbackHandler()
     model = ChatOpenAI(
         model_name="gpt-4-turbo-2024-04-09",
@@ -76,22 +79,33 @@ async def send_message(messages: List[ChatMessage]) -> AsyncIterable[str]:
 
     try:
         async for token in callback.aiter():
-            if not streaming_active:
-                break  # Stop streaming if the global flag indicates
             yield token
+            if not streaming_active:
+                break  # Signal to break the loop when streaming is to be stopped
     except Exception as e:
-        print(f"caught exception: {e}")
+        print(f"Caught exception: {e}", flush=True)
     finally:
+        if not streaming_active and task:  # Check if the streaming is stopped and task exists
+            task.cancel()  # Cancel the task if streaming is stopped
+        try:
+            await task  # Await the task to handle any cleanup after cancellation
+        except asyncio.CancelledError:
+            print("Task cancelled successfully", flush=True)
         callback.done.set()
         streaming_active = True  # Reset the flag when done or when stopping the stream
-    await task
+
 
 @app.post("/stream_chat/")
 async def stream_chat(message: Message):
     global streaming_active
-    streaming_active = True  # Ensure the stream is active when starting
+    streaming_active = True
     generator = send_message(message.messages)
-    return StreamingResponse(generator, media_type="text/event-stream")
+    headers = {
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Content-Type': 'text/event-stream'
+    }
+    return StreamingResponse(generator, media_type="text/event-stream", headers=headers)
 
 @app.post("/stop_stream/")
 def stop_stream():
