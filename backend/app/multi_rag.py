@@ -15,7 +15,7 @@ load_dotenv()
 
 
 async def fetch_documents_for_queries(retriever, queries):
-    tasks = [retriever.aget_relevant_documents(query) for query in queries]
+    tasks = [retriever.ainvoke(query) for query in queries]
     results = await asyncio.gather(*tasks)
 
     # Use a set to track unique document contents
